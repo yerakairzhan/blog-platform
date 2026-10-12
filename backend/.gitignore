@@ -1,0 +1,32 @@
+# Compiled binaries and test files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace and vendor dependencies
+.go/
+vendor/
+go.work
+go.work.sum
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Protocol Buffer / gRPC Generated Files
+# Uncomment the following line if you want to force developers to generate
+# proto files locally rather than committing them to version control.
+# *.pb.go
