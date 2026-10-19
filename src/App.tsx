@@ -1,31 +1,30 @@
-import { createHashRouter } from 'react-router'
-// The DOM build wires in ReactDOM.flushSync, which useFeedQuery relies on.
-import { RouterProvider } from 'react-router/dom'
-import { Layout } from './components/Layout'
-import { PostsProvider } from './context/PostsContext'
+import { useState } from 'react'
+import { HashRouter, Route, Routes } from 'react-router'
+import { Header } from './components/Header'
+import { Message } from './components/Message'
+import { ScrollToTop } from './components/ScrollToTop'
+import { DEFAULT_FILTERS } from './filters'
 import { FeedPage } from './pages/FeedPage'
 import { NewPostPage } from './pages/NewPostPage'
-import { NotFoundPage } from './pages/NotFoundPage'
 import { PostPage } from './pages/PostPage'
 
-// Hash URLs (/#/posts/5) keep deep links and refreshes working on GitHub Pages,
-// which has no server-side fallback to index.html.
-const router = createHashRouter([
-  {
-    element: <Layout />,
-    children: [
-      { index: true, element: <FeedPage /> },
-      { path: 'posts/new', element: <NewPostPage /> },
-      { path: 'posts/:postId', element: <PostPage /> },
-      { path: '*', element: <NotFoundPage /> },
-    ],
-  },
-])
-
 export function App() {
+  // The filters live here and not in FeedPage: FeedPage is removed when you open a post,
+  // which would reset its state. App is never removed, so the filters are kept.
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+
   return (
-    <PostsProvider>
-      <RouterProvider router={router} />
-    </PostsProvider>
+    <HashRouter>
+      <ScrollToTop />
+      <Header />
+      <main className="container">
+        <Routes>
+          <Route path="/" element={<FeedPage filters={filters} onFiltersChange={setFilters} />} />
+          <Route path="/posts/new" element={<NewPostPage />} />
+          <Route path="/posts/:id" element={<PostPage />} />
+          <Route path="*" element={<Message text="Page not found." />} />
+        </Routes>
+      </main>
+    </HashRouter>
   )
 }

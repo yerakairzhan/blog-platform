@@ -1,208 +1,115 @@
-import { useCallback } from 'react'
-import { Link } from 'react-router'
-import { FeedToolbar } from '../components/FeedToolbar'
+import { useEffect, useState } from 'react'
+import { fetchPosts, getErrorMessage } from '../api'
+import { Message } from '../components/Message'
 import { Pagination } from '../components/Pagination'
-import { Panel } from '../components/Panel'
-import { PostGrid, PostGridSkeleton } from '../components/PostGrid'
-import { StatusMessage } from '../components/StatusMessage'
-import { TopTags } from '../components/TopTags'
-import { usePosts } from '../context/PostsContext'
-import { useFeedQuery } from '../hooks/useFeedQuery'
-import type { FeedQuery } from '../hooks/useFeedQuery'
-import { countTags, filterPosts, paginate, sortPosts } from '../lib/feed'
-import type { PageSlice } from '../lib/feed'
-import type { Post } from '../types'
-import styles from './FeedPage.module.css'
+import { PostCard } from '../components/PostCard'
+import { SearchInput } from '../components/SearchInput'
+import { SelectField } from '../components/SelectField'
+import { DEFAULT_FILTERS, PAGE_SIZE, SORT_OPTIONS, applyFilters, getAllTags } from '../filters'
+import { getLocalPosts } from '../localPosts'
+import type { Filters, Post, Status } from '../types'
 
-const TOP_TAGS_LIMIT = 12
+interface FeedPageProps {
+  filters: Filters
+  onFiltersChange: (filters: Filters) => void
+}
 
-export function FeedPage() {
-  const { status, error, posts, authors, toggleLike, retry } = usePosts()
-  const { query, updateQuery, resetQuery, isFiltered, canReset } = useFeedQuery()
+export function FeedPage({ filters, onFiltersChange }: FeedPageProps) {
+  const [posts, setPosts] = useState<Post[]>([])
+  const [status, setStatus] = useState<Status>('loading')
+  const [error, setError] = useState('')
+  const [reloadCount, setReloadCount] = useState(0)
 
-  // Stable while the URL is unchanged, so SearchBar's debounce timer isn't restarted by
-  // unrelated re-renders (e.g. a like).
-  const handleSearch = useCallback((search: string) => updateQuery({ search }), [updateQuery])
-  const handleTag = useCallback((tag: string) => updateQuery({ tag }), [updateQuery])
+  // Load posts on mount, and again whenever "Try again" increases reloadCount.
+  useEffect(() => {
+    const controller = new AbortController()
 
-  // Everything below is derived from posts + query on each render; none of it is state.
-  const tagCounts = countTags(posts)
-  const results = sortPosts(filterPosts(posts, query), query.sort)
-  const slice = paginate(results, query.page, query.pageSize)
-  const writtenCount = posts.filter((post) => post.isLocal).length
-  const likedCount = posts.filter((post) => post.likedByMe).length
+    fetchPosts(controller.signal)
+      .then((apiPosts) => {
+        setPosts([...getLocalPosts(), ...apiPosts])
+        setStatus('success')
+      })
+      .catch((err) => {
+        // The request was cancelled because we left the page: ignore it.
+        if (controller.signal.aborted) return
+        setError(getErrorMessage(err))
+        setStatus('error')
+      })
 
-  function renderResults() {
-    if (status === 'loading') {
-      return (
-        <>
-          <p role="status" className="visually-hidden">
-            Loading posts…
-          </p>
-          <PostGridSkeleton count={6} />
-        </>
-      )
-    }
+    // Cleanup: cancel the request if the page is closed before it finishes.
+    return () => controller.abort()
+  }, [reloadCount])
 
-    if (status === 'error') {
-      return (
-        <StatusMessage
-          variant="error"
-          title="Couldn't load the stories"
-          action={
-            <button type="button" className="btn btn-primary" onClick={retry}>
-              Try again
-            </button>
-          }
-        >
-          {error}
-        </StatusMessage>
-      )
-    }
+  function handleRetry() {
+    setStatus('loading')
+    setReloadCount(reloadCount + 1)
+  }
 
-    if (slice.total === 0) {
-      return <EmptyResults query={query} writtenCount={writtenCount} likedCount={likedCount} onReset={resetQuery} />
-    }
+  // Changing search, tag or sort always goes back to page 1.
+  function changeFilter(name: 'search' | 'tag' | 'sort', value: string) {
+    onFiltersChange({ ...filters, [name]: value, page: 1 })
+  }
 
-    return (
-      <>
-        <ResultsSummary slice={slice} search={query.search} isFiltered={isFiltered} />
-        <PostGrid
-          posts={slice.items}
-          authors={authors}
-          activeTag={query.tag}
-          onToggleLike={toggleLike}
-          onTagClick={handleTag}
+  function changePage(page: number) {
+    onFiltersChange({ ...filters, page })
+    window.scrollTo(0, 0)
+  }
+
+  // These values are calculated from posts + filters on every render, so they are not state.
+  const tagOptions = [
+    { value: '', label: 'All tags' },
+    ...getAllTags(posts).map((tag) => ({ value: tag, label: tag })),
+  ]
+  const visiblePosts = applyFilters(posts, filters)
+  const totalPages = Math.max(1, Math.ceil(visiblePosts.length / PAGE_SIZE))
+  const page = Math.min(filters.page, totalPages)
+  const start = (page - 1) * PAGE_SIZE
+  const pagePosts = visiblePosts.slice(start, start + PAGE_SIZE)
+
+  return (
+    <div>
+      <h1>All posts</h1>
+
+      <div className="toolbar">
+        <SearchInput value={filters.search} onChange={(value) => changeFilter('search', value)} />
+        <SelectField
+          label="Tag"
+          value={filters.tag}
+          options={tagOptions}
+          onChange={(value) => changeFilter('tag', value)}
         />
-        <Pagination page={slice.page} totalPages={slice.totalPages} onPageChange={(page) => updateQuery({ page })} />
-      </>
-    )
-  }
-
-  return (
-    <div className={styles.page}>
-      <section className={styles.hero}>
-        <h1 className={styles.heading}>Stories worth a slow read</h1>
-        <p className={styles.lead}>
-          Browse short stories from the community, follow the tags you love, and add your own.
-        </p>
-      </section>
-
-      <div className={styles.layout}>
-        <div className={styles.content}>
-          <FeedToolbar
-            query={query}
-            tags={tagCounts}
-            canReset={canReset}
-            onSearch={handleSearch}
-            onChange={updateQuery}
-            onReset={resetQuery}
-          />
-          {renderResults()}
-        </div>
-
-        <aside className={styles.sidebar}>
-          <Panel title="Popular tags">
-            {status === 'success' ? (
-              <TopTags tags={tagCounts.slice(0, TOP_TAGS_LIMIT)} activeTag={query.tag} onSelect={handleTag} />
-            ) : (
-              <p className={styles.muted}>{status === 'loading' ? 'Loading tags…' : 'Tags are unavailable.'}</p>
-            )}
-          </Panel>
-          <Panel title="At a glance">
-            <dl className={styles.stats}>
-              <div>
-                <dt>Stories</dt>
-                <dd>{status === 'success' ? posts.length : '–'}</dd>
-              </div>
-              <div>
-                <dt>Writers</dt>
-                <dd>{status === 'success' ? authors.size : '–'}</dd>
-              </div>
-              <div>
-                <dt>Written by you</dt>
-                <dd>{writtenCount}</dd>
-              </div>
-              <div>
-                <dt>Liked by you</dt>
-                <dd>{likedCount}</dd>
-              </div>
-            </dl>
-          </Panel>
-        </aside>
+        <SelectField
+          label="Sort by"
+          value={filters.sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => changeFilter('sort', value)}
+        />
+        <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}>Reset</button>
       </div>
+
+      {status === 'loading' && <Message text="Loading posts..." />}
+
+      {status === 'error' && (
+        <Message text={`Could not load posts. ${error}`}>
+          <button onClick={handleRetry}>Try again</button>
+        </Message>
+      )}
+
+      {status === 'success' && visiblePosts.length === 0 && (
+        <Message text="No posts match your search." />
+      )}
+
+      {status === 'success' && visiblePosts.length > 0 && (
+        <>
+          <p className="muted">
+            Showing {start + 1}-{start + pagePosts.length} of {visiblePosts.length} posts
+          </p>
+          {pagePosts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+          <Pagination page={page} totalPages={totalPages} onPageChange={changePage} />
+        </>
+      )}
     </div>
-  )
-}
-
-interface ResultsSummaryProps {
-  slice: PageSlice<Post>
-  search: string
-  isFiltered: boolean
-}
-
-function ResultsSummary({ slice, search, isFiltered }: ResultsSummaryProps) {
-  return (
-    <p className={styles.summary} role="status">
-      Showing <strong>{slice.start}</strong>–<strong>{slice.end}</strong> of <strong>{slice.total}</strong>{' '}
-      {isFiltered && 'matching '}
-      {slice.total === 1 ? 'story' : 'stories'}
-      {search.trim() && <> for “{search.trim()}”</>}
-    </p>
-  )
-}
-
-interface EmptyResultsProps {
-  query: FeedQuery
-  writtenCount: number
-  likedCount: number
-  onReset: () => void
-}
-
-function EmptyResults({ query, writtenCount, likedCount, onReset }: EmptyResultsProps) {
-  if (query.source === 'mine' && writtenCount === 0) {
-    return (
-      <StatusMessage
-        variant="empty"
-        title="You haven't written anything yet"
-        action={
-          <Link to="/posts/new" className="btn btn-primary">
-            Write your first post
-          </Link>
-        }
-      >
-        Your posts will show up here and in the main feed.
-      </StatusMessage>
-    )
-  }
-
-  if (query.source === 'liked' && likedCount === 0) {
-    return (
-      <StatusMessage
-        variant="empty"
-        title="No liked stories yet"
-        action={
-          <button type="button" className="btn" onClick={onReset}>
-            Browse all stories
-          </button>
-        }
-      >
-        Tap the heart on any story to keep it here.
-      </StatusMessage>
-    )
-  }
-
-  return (
-    <StatusMessage
-      variant="empty"
-      title="No stories match your filters"
-      action={
-        <button type="button" className="btn" onClick={onReset}>
-          Reset filters
-        </button>
-      }
-    >
-      Try a different search term or another tag.
-    </StatusMessage>
   )
 }

@@ -1,129 +1,91 @@
-# Inkwell
+# Blog Platform
 
-A community reading room for short stories: browse 250+ stories, search and filter them by tag,
-open a story with its author and comments, like what you enjoy, and publish your own.
+A simple blog where you can read posts, search and filter them, open a post with its comments,
+and write your own post.
 
 **Live demo:** https://yerakairzhan.github.io/blog-platform/
 
-Built with React 19, TypeScript, React Router and Vite. Data comes from the public
-[DummyJSON](https://dummyjson.com) API.
+Built with React, TypeScript, React Router and Vite. Data comes from the public
+[DummyJSON](https://dummyjson.com) API (251 posts).
 
 ## Features
 
-| Feature | Where |
-|---|---|
-| **List view**: story feed in a responsive card grid | `pages/FeedPage.tsx` |
-| **Detail view**: full story, author, views/likes, comments, previous/next story | `pages/PostPage.tsx`, `components/PostDetail.tsx` |
-| **Search**: titles, story text and tags, debounced while typing | `components/SearchBar.tsx` |
-| **Filtering**: by tag (select or popular-tag chips) and by "All / Written by you / Liked by you" | `lib/feed.ts` → `filterPosts` |
-| **Sorting**: latest, most liked, most viewed, title A–Z | `lib/feed.ts` → `sortPosts` |
-| **Pagination**: 6 / 12 / 24 per page, numbered pages with gaps | `components/Pagination.tsx`, `lib/feed.ts` → `paginate` |
-| **Controlled form to add an item**: validated title, story and tags, with tag suggestions | `components/PostForm.tsx` |
-| **Comments**: loaded per story, plus a controlled comment form | `components/CommentSection.tsx` |
-| **Likes**: toggle on any story; counts and the "Liked by you" filter update instantly | `context/PostsContext.tsx` |
-| **Loading / error / empty / success states**: skeletons, retry buttons, tailored empty messages | everywhere data is shown |
+- **List of posts** with search (title and text), tag filter, sorting and pagination (10 per page)
+- **Post page** with author, likes, views, tags, comments, and previous/next post links
+- **New post form** (controlled inputs) with validation
+- **Loading, error, empty and success states** on every page that loads data
 
-All search, filter, sort and page settings live in the URL (e.g. `#/?q=love&tag=mystery&sort=popular&page=2`).
-Opening a story and pressing *Back to feed* returns to the same view, and filtered views can be shared as links.
+## How it works
 
-## Data source
+### Pages
 
-* `GET /posts?limit=0`: all 251 stories in one request
-* `GET /users?limit=0&select=…`: authors (208)
-* `GET /posts/:id/comments`: comments for one story
-* `POST /posts/add`: validates a new story
-
-DummyJSON doesn't save new stories. It validates them and echoes them back. The app keeps your stories,
-likes and comments in `localStorage` and merges them with the API data, so a new story shows up
-immediately in the feed, search, filters and sort, and is still there after a reload.
-
-All stories are loaded once and filtered on the client because DummyJSON can't combine search and
-tag filtering in a single request. This way every combination of search, filter, sort and page works.
-
-## Architecture
-
-```
-<App>
-└── <PostsProvider>                 posts, authors, likes, load status (shared by every page)
-    └── <RouterProvider>            hash router
-        └── <Layout>                header, footer, <Outlet />, <ScrollRestoration />
-            ├── <FeedPage>          reads filters from the URL, derives the visible list
-            │   ├── <FeedToolbar>   <SearchBar>, 4× <SelectField>, Reset
-            │   ├── <PostGrid>      <PostCard> × n → <AuthorLine>, <TagList>, <LikeButton>
-            │   ├── <Pagination>
-            │   └── <Panel>         <TopTags>, stats
-            ├── <PostPage>          finds the post, handles loading / error / not-found
-            │   └── <PostDetail key={post.id}>
-            │       └── <CommentSection>  fetches comments, <CommentForm>
-            ├── <NewPostPage>       <PostForm> → <FormField> × 3
-            └── <NotFoundPage>
-```
-
-### Where state lives, and why
-
-| State | Location | Reason |
+| Page | URL | What it does |
 |---|---|---|
-| Posts, authors, load status, likes, your posts | `PostsProvider` (context above the router) | Needed by the feed, the story page and the editor; fetched once, not on every navigation |
-| Search / tag / show / sort / page / page size | URL query string (`useFeedQuery`) | Survives navigation and Back, and can be shared as a link |
-| Text being typed in the search box | `SearchBar` (`useState`) | Updates on every keystroke; only committed to the URL after a 300 ms pause |
-| Form values, touched fields, submit status | `PostForm` (`useState`) | Belongs only to the form |
-| Comments of the open story, comment draft | `CommentSection` / `CommentForm` | Belongs to one story; reset by `key` when the story changes |
-| Delete confirmation | `PostDetail` | UI state for one story |
+| `FeedPage` | `#/` | Loads all posts, then filters, sorts and paginates them |
+| `PostPage` | `#/posts/:id` | Loads one post, its author and its comments |
+| `NewPostPage` | `#/posts/new` | Form for writing a new post |
 
-The filtered, sorted and paginated list, tag counts and form errors are **derived during render**,
-not stored in state, so they can't fall out of sync with their inputs.
+### Data
 
-### Effects, cleanup and race conditions
+- `GET /posts?limit=0`: all posts
+- `GET /posts/:id`, `GET /users/:id`, `GET /posts/:id/comments`: one post, its author and its comments
+- `POST /posts/add`: creates a post
 
-* **Loading posts and authors** (`PostsContext`): one effect with an `AbortController`. Its cleanup aborts the
-  request on unmount, and in development StrictMode's double-run aborts the first request.
-  *Try again* re-runs the effect by changing its `attempt` dependency.
-* **Loading comments** (`CommentSection`): the effect depends on `post.id`. When you click *Next* several
-  times quickly, each cleanup aborts the previous request, and an aborted request never sets state, so a slow
-  response for an old story can't replace the comments of the current one.
-* **Debounced search** (`SearchBar`): every keystroke re-runs the effect, and its cleanup clears the
-  previous timer, so only the last value is committed.
-* **Persistence**: effects write your posts and likes to `localStorage` whenever they change.
-  State is read from `localStorage` with lazy `useState` initialisers, so it is only read on mount.
+DummyJSON does not really save new posts, so after the API accepts a post we also save it in
+`localStorage` (`src/localPosts.ts`). Saved posts are shown at the top of the list.
 
-### Keys and component identity
+### State
 
-* Lists use stable ids (`post.id`, `tag`, page number), never array indexes, except for the fixed
-  loading skeleton which never reorders.
-* React Router keeps the same `<PostPage>` mounted when going from `/posts/1` to `/posts/2`. Rendering
-  `<PostDetail key={post.id}>` makes React treat each story as a new component. The delete confirmation,
-  comments and half-typed comment are reset instead of leaking into the next story.
-* `SearchBar` copies an outside change to its value (Reset, browser Back) into its local text during render,
-  instead of in an effect.
+| State | Where | Why |
+|---|---|---|
+| Filters (search, tag, sort, page) | `App` | `FeedPage` is removed when you open a post, so its state would be lost. `App` stays, so the filters are kept when you come back. |
+| Posts, loading status, error | `FeedPage` | Only the list page needs them |
+| One post, author, comments | `PostDetails` (in `PostPage`) | Only the post page needs them |
+| Form fields and errors | `NewPostPage` | Only the form needs them |
+
+The filtered and paginated list is **calculated during render** from posts + filters (`src/filters.ts`),
+so it is not stored in state.
+
+### Effects
+
+- `FeedPage` loads posts in `useEffect`. The cleanup aborts the request (`AbortController`)
+  if you leave the page before it finishes. "Try again" changes `reloadCount`, which is in the
+  dependency array, so the effect runs again.
+- `PostDetails` loads a post when `postId` changes. If you click "Next post" quickly several times,
+  each cleanup aborts the previous request, so an old, slow response can never replace the current post
+  (no race condition).
+- `ScrollToTop` scrolls to the top when the URL path changes.
+
+### Keys
+
+- Lists use ids as keys (`post.id`, `comment.id`, the tag name), not array indexes.
+- `<PostDetails key={id} />`: when you go to another post, React creates a fresh `PostDetails`,
+  so the old post is never shown while the new one is loading.
 
 ## Project structure
 
 ```
 src/
-├── api/          fetch wrapper + DummyJSON calls (maps API data to app types)
-├── components/   reusable UI components, each with its own CSS module
-├── context/      PostsContext: shared data and actions
-├── hooks/        useFeedQuery: feed state stored in the URL
-├── lib/          pure helpers: filter/sort/paginate, localStorage, authors
-├── pages/        one component per route
-├── types.ts
-├── App.tsx       routes
-└── main.tsx
+├── api.ts          requests to DummyJSON
+├── filters.ts      search, tag filter and sorting
+├── localPosts.ts   saving new posts in localStorage
+├── types.ts        TypeScript types
+├── App.tsx         routes + filter state
+├── components/     small reusable components (PostCard, Pagination, SelectField, ...)
+└── pages/          FeedPage, PostPage, NewPostPage
 ```
 
 ## Run locally
 
-Requires Node 20.19+ and pnpm.
-
 ```bash
 pnpm install
-pnpm dev        # http://localhost:5173
-pnpm build      # type-check + production build into dist/
-pnpm preview    # serve the production build
+pnpm dev
 ```
+
+Open http://localhost:5173.
 
 ## Deployment
 
-Every push to `main` runs `.github/workflows/deploy.yml`, which builds the app and publishes `dist/` to
-GitHub Pages. The app uses hash URLs (`/#/posts/5`) because GitHub Pages can't serve `index.html` for
-unknown paths, so refreshing or opening a deep link always works.
+Every push to `main` builds the app and deploys it to GitHub Pages
+(`.github/workflows/deploy.yml`). The app uses hash URLs (`#/posts/5`) so that refreshing any page
+works on GitHub Pages.

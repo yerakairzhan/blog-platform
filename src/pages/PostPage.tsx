@@ -1,75 +1,99 @@
-import { Link, useLocation, useParams } from 'react-router'
-import { PostDetail } from '../components/PostDetail'
-import { StatusMessage } from '../components/StatusMessage'
-import { usePosts } from '../context/PostsContext'
-import { getAuthor } from '../lib/authors'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router'
+import { fetchComments, fetchPost, fetchUser, getErrorMessage } from '../api'
+import { CommentList } from '../components/CommentList'
+import { Message } from '../components/Message'
+import { TagList } from '../components/TagList'
+import { getLocalPosts } from '../localPosts'
+import type { Comment, Post, Status, User } from '../types'
 
-/** Where "Back to feed" goes: the feed URL (with filters) the user came from, if any. */
-function readBackTo(state: unknown): string {
-  if (typeof state === 'object' && state !== null && 'backTo' in state) {
-    const { backTo } = state
-    if (typeof backTo === 'string' && backTo.startsWith('/')) return backTo
-  }
-  return '/'
-}
+const LAST_POST_ID = 251 // DummyJSON has posts with ids 1 to 251
 
 export function PostPage() {
-  const { postId } = useParams()
-  const location = useLocation()
-  const { status, error, posts, authors, toggleLike, deletePost, retry } = usePosts()
-  const backTo = readBackTo(location.state)
+  const { id } = useParams()
 
-  if (status === 'loading') {
-    return <StatusMessage variant="loading" title="Loading story…" />
-  }
+  // key={id}: when the id changes (e.g. "Next post"), React creates a new PostDetails
+  // instead of reusing the old one, so all its state starts fresh from "loading".
+  return <PostDetails key={id} postId={Number(id)} />
+}
 
-  if (status === 'error') {
-    return (
-      <StatusMessage
-        variant="error"
-        title="Couldn't load this story"
-        action={
-          <button type="button" className="btn btn-primary" onClick={retry}>
-            Try again
-          </button>
-        }
-      >
-        {error}
-      </StatusMessage>
-    )
-  }
+function PostDetails({ postId }: { postId: number }) {
+  const [post, setPost] = useState<Post | null>(null)
+  const [author, setAuthor] = useState<User | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [status, setStatus] = useState<Status>('loading')
+  const [error, setError] = useState('')
 
-  const index = posts.findIndex((post) => post.id === Number(postId))
-  const post = posts[index]
+  useEffect(() => {
+    // Posts created in this browser are not on the server.
+    const localPost = getLocalPosts().find((p) => p.id === postId)
+    if (localPost) {
+      setPost(localPost)
+      setStatus('success')
+      return
+    }
 
-  if (!post) {
-    return (
-      <StatusMessage
-        variant="empty"
-        title="Story not found"
-        action={
-          <Link to="/" className="btn btn-primary">
-            Back to feed
-          </Link>
-        }
-      >
-        It may have been deleted, or the link is incorrect.
-      </StatusMessage>
-    )
-  }
+    const controller = new AbortController()
+
+    async function loadPost() {
+      try {
+        const loadedPost = await fetchPost(postId, controller.signal)
+        const [loadedAuthor, loadedComments] = await Promise.all([
+          fetchUser(loadedPost.userId, controller.signal),
+          fetchComments(postId, controller.signal),
+        ])
+        setPost(loadedPost)
+        setAuthor(loadedAuthor)
+        setComments(loadedComments)
+        setStatus('success')
+      } catch (err) {
+        // Cancelled because the user already moved to another post: ignore the old result.
+        if (controller.signal.aborted) return
+        setError(getErrorMessage(err))
+        setStatus('error')
+      }
+    }
+
+    loadPost()
+
+    // Cleanup runs when postId changes or the page closes, and cancels the old request,
+    // so a slow response for an old post can never replace the current one.
+    return () => controller.abort()
+  }, [postId])
+
+  const authorName = author ? `${author.firstName} ${author.lastName}` : 'You'
 
   return (
-    // The route element stays mounted between /posts/1 and /posts/2; the key forces a fresh
-    // PostDetail (and CommentSection) per post so no state leaks from the previous one.
-    <PostDetail
-      key={post.id}
-      post={post}
-      author={getAuthor(authors, post.userId)}
-      previous={posts[index - 1]}
-      next={posts[index + 1]}
-      backTo={backTo}
-      onToggleLike={toggleLike}
-      onDelete={deletePost}
-    />
+    <div>
+      <Link to="/" className="back-link">
+        ← Back to all posts
+      </Link>
+
+      {status === 'loading' && <Message text="Loading post..." />}
+
+      {status === 'error' && <Message text={`Could not load the post. ${error}`} />}
+
+      {status === 'success' && post && (
+        <article className="post">
+          <h1>{post.title}</h1>
+          <p className="muted">
+            By {authorName} · {post.reactions.likes} likes · {post.reactions.dislikes} dislikes ·{' '}
+            {post.views} views
+          </p>
+          <TagList tags={post.tags} />
+          <p className="post-body">{post.body}</p>
+
+          <h2>Comments ({comments.length})</h2>
+          <CommentList comments={comments} />
+        </article>
+      )}
+
+      {postId <= LAST_POST_ID && (
+        <div className="pagination">
+          {postId > 1 && <Link to={`/posts/${postId - 1}`}>← Previous post</Link>}
+          {postId < LAST_POST_ID && <Link to={`/posts/${postId + 1}`}>Next post →</Link>}
+        </div>
+      )}
+    </div>
   )
 }

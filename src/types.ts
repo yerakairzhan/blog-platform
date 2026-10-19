@@ -1,38 +1,31 @@
-export type LoadStatus = 'loading' | 'error' | 'success'
-
 export interface Post {
   id: number
   title: string
   body: string
   tags: string[]
-  likes: number
-  dislikes: number
+  reactions: { likes: number; dislikes: number }
   views: number
   userId: number
-  /** Written in this browser (kept in localStorage), not on DummyJSON. */
-  isLocal: boolean
-  likedByMe: boolean
+  isLocal?: boolean // true for posts created in this browser
 }
 
-export interface Author {
+export interface User {
   id: number
-  name: string
-  username: string
-  avatarUrl: string | null
+  firstName: string
+  lastName: string
 }
 
 export interface Comment {
   id: number
-  postId: number
   body: string
-  likes: number
-  authorName: string
-  authorUsername: string
-  isLocal: boolean
+  user: { fullName: string }
 }
 
-export interface PostDraft {
-  title: string
-  body: string
-  tags: string[]
+export interface Filters {
+  search: string
+  tag: string
+  sort: string
+  page: number
 }
+
+export type Status = 'loading' | 'error' | 'success'
