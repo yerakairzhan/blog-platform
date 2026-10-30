@@ -11,6 +11,5 @@ dist/
 .DS_Store
 *.sw?
 
-# TypeScript build cache & local tool config
+# TypeScript build cache
 *.tsbuildinfo
-.claude/
