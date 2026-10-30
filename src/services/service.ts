@@ -1,4 +1,4 @@
-import type { Comment, Post, User } from './types'
+import type { Comment, Post, User } from '../types'
 
 const BASE_URL = 'https://dummyjson.com'
 

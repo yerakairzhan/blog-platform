@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { createPost, getErrorMessage } from '../api'
+import { createPost, getErrorMessage } from '../services/service'
 import { FormField } from '../components/FormField'
 import { saveLocalPost } from '../localPosts'
 
@@ -11,7 +11,7 @@ interface FormErrors {
   tags?: string
 }
 
-export function NewPostPage() {
+export default function NewPostPage() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')

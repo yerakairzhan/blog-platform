@@ -1,6 +1,6 @@
 import { Link, NavLink } from 'react-router'
 
-export function Header() {
+export function NavBar() {
   return (
     <header className="header">
       <div className="container header-inner">
@@ -9,9 +9,15 @@ export function Header() {
         </Link>
         <nav className="nav">
           <NavLink to="/" end>
-            All posts
+            Home
+          </NavLink>
+          <NavLink to="/posts" end>
+            Posts
           </NavLink>
           <NavLink to="/posts/new">New post</NavLink>
+          <NavLink to="/dashboard">Dashboard</NavLink>
+          <NavLink to="/about">About</NavLink>
+          <NavLink to="/login">Login</NavLink>
         </nav>
       </div>
     </header>

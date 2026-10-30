@@ -1,61 +1,49 @@
-import { useEffect, useState } from 'react'
-import { fetchPosts, getErrorMessage } from '../api'
+import { useSearchParams } from 'react-router'
 import { Message } from '../components/Message'
 import { Pagination } from '../components/Pagination'
 import { PostCard } from '../components/PostCard'
 import { SearchInput } from '../components/SearchInput'
 import { SelectField } from '../components/SelectField'
-import { DEFAULT_FILTERS, PAGE_SIZE, SORT_OPTIONS, applyFilters, getAllTags } from '../filters'
-import { getLocalPosts } from '../localPosts'
-import type { Filters, Post, Status } from '../types'
+import {
+  MIN_LIKES_OPTIONS,
+  PAGE_SIZE,
+  SORT_OPTIONS,
+  applyFilters,
+  getAllTags,
+  getFiltersFromParams,
+} from '../filters'
+import { usePosts } from '../hooks/usePosts'
 
-interface FeedPageProps {
-  filters: Filters
-  onFiltersChange: (filters: Filters) => void
-}
+export default function PostsPage() {
+  const { posts, status, error, retry } = usePosts()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filters = getFiltersFromParams(searchParams)
 
-export function FeedPage({ filters, onFiltersChange }: FeedPageProps) {
-  const [posts, setPosts] = useState<Post[]>([])
-  const [status, setStatus] = useState<Status>('loading')
-  const [error, setError] = useState('')
-  const [reloadCount, setReloadCount] = useState(0)
-
-  // Load posts on mount, and again whenever "Try again" increases reloadCount.
-  useEffect(() => {
-    const controller = new AbortController()
-
-    fetchPosts(controller.signal)
-      .then((apiPosts) => {
-        setPosts([...getLocalPosts(), ...apiPosts])
-        setStatus('success')
-      })
-      .catch((err) => {
-        // The request was cancelled because we left the page: ignore it.
-        if (controller.signal.aborted) return
-        setError(getErrorMessage(err))
-        setStatus('error')
-      })
-
-    // Cleanup: cancel the request if the page is closed before it finishes.
-    return () => controller.abort()
-  }, [reloadCount])
-
-  function handleRetry() {
-    setStatus('loading')
-    setReloadCount(reloadCount + 1)
-  }
-
-  // Changing search, tag or sort always goes back to page 1.
-  function changeFilter(name: 'search' | 'tag' | 'sort', value: string) {
-    onFiltersChange({ ...filters, [name]: value, page: 1 })
+  // Changing search, tag, likes or sort updates the URL and goes back to page 1.
+  function changeFilter(name: 'search' | 'tag' | 'minLikes' | 'sort', value: string) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (value === '') {
+      nextParams.delete(name)
+    } else {
+      nextParams.set(name, value)
+    }
+    nextParams.delete('page')
+    // replace: typing in the search box should not add a history entry per letter
+    setSearchParams(nextParams, { replace: true })
   }
 
   function changePage(page: number) {
-    onFiltersChange({ ...filters, page })
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('page', String(page))
+    setSearchParams(nextParams)
     window.scrollTo(0, 0)
   }
 
-  // These values are calculated from posts + filters on every render, so they are not state.
+  function handleReset() {
+    setSearchParams({})
+  }
+
+  // These values are calculated from posts + URL on every render, so they are not state.
   const tagOptions = [
     { value: '', label: 'All tags' },
     ...getAllTags(posts).map((tag) => ({ value: tag, label: tag })),
@@ -79,19 +67,25 @@ export function FeedPage({ filters, onFiltersChange }: FeedPageProps) {
           onChange={(value) => changeFilter('tag', value)}
         />
         <SelectField
+          label="Likes"
+          value={filters.minLikes}
+          options={MIN_LIKES_OPTIONS}
+          onChange={(value) => changeFilter('minLikes', value)}
+        />
+        <SelectField
           label="Sort by"
           value={filters.sort}
           options={SORT_OPTIONS}
           onChange={(value) => changeFilter('sort', value)}
         />
-        <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}>Reset</button>
+        <button onClick={handleReset}>Reset</button>
       </div>
 
       {status === 'loading' && <Message text="Loading posts..." />}
 
       {status === 'error' && (
         <Message text={`Could not load posts. ${error}`}>
-          <button onClick={handleRetry}>Try again</button>
+          <button onClick={retry}>Try again</button>
         </Message>
       )}
 

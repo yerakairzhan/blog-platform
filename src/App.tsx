@@ -1,30 +1,31 @@
-import { useState } from 'react'
+import { lazy } from 'react'
 import { HashRouter, Route, Routes } from 'react-router'
-import { Header } from './components/Header'
-import { Message } from './components/Message'
-import { ScrollToTop } from './components/ScrollToTop'
-import { DEFAULT_FILTERS } from './filters'
-import { FeedPage } from './pages/FeedPage'
-import { NewPostPage } from './pages/NewPostPage'
-import { PostPage } from './pages/PostPage'
+import { RootLayout } from './components/RootLayout'
+import { HomePage } from './pages/HomePage'
+import { NotFoundPage } from './pages/NotFoundPage'
+
+const AboutPage = lazy(() => import('./pages/AboutPage'))
+const PostsPage = lazy(() => import('./pages/PostsPage'))
+const PostPage = lazy(() => import('./pages/PostPage'))
+const NewPostPage = lazy(() => import('./pages/NewPostPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
 
 export function App() {
-  // The filters live here and not in FeedPage: FeedPage is removed when you open a post,
-  // which would reset its state. App is never removed, so the filters are kept.
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
-
   return (
     <HashRouter>
-      <ScrollToTop />
-      <Header />
-      <main className="container">
-        <Routes>
-          <Route path="/" element={<FeedPage filters={filters} onFiltersChange={setFilters} />} />
-          <Route path="/posts/new" element={<NewPostPage />} />
-          <Route path="/posts/:id" element={<PostPage />} />
-          <Route path="*" element={<Message text="Page not found." />} />
-        </Routes>
-      </main>
+      <Routes>
+        <Route element={<RootLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="posts" element={<PostsPage />} />
+          <Route path="posts/new" element={<NewPostPage />} />
+          <Route path="posts/:id" element={<PostPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
     </HashRouter>
   )
 }

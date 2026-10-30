@@ -24,6 +24,7 @@ export interface Comment {
 export interface Filters {
   search: string
   tag: string
+  minLikes: string
   sort: string
   page: number
 }
