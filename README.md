@@ -10,11 +10,11 @@ Built with React, TypeScript, React Router and Vite. Data comes from the public
 
 ## Features
 
-- **Routes:** `/` Home, `/about`, `/posts` (list), `/posts/:id` (details), `/posts/new`, `/dashboard`, `/login`, and a 404 page for everything else
+- **Routes:** `/` Home, `/about`, `/posts` (list), `/posts/:id` (details), `/posts/new`, `/dashboard`, `/login`, `/signup`, `/profile` (protected), and a 404 page for everything else
 - **Posts list** with search, tag filter, minimum-likes filter, sorting and pagination (10 per page). All of them are saved in the URL (`#/posts?tag=love&page=2`), so links, refresh and Back/Forward work
 - **Post details** with 8 details (id, author, likes, dislikes, views, comments, reading time, tags), comments, Back / All posts links and previous/next post links. A wrong id shows "does not exist" or the 404 page
 - **Dashboard** with 4 statistics, 2 breakdowns (top tags, posts by likes) and a tag filter that changes all numbers
-- **Login** is a styled placeholder for future authentication
+- **Authentication** with Firebase: login, signup, Google sign-in and a protected profile (see below)
 - **Loading, error, empty and success states** on every page that loads data
 
 ## How it works
@@ -22,7 +22,7 @@ Built with React, TypeScript, React Router and Vite. Data comes from the public
 ### Routing
 
 `App.tsx` only contains the routes. `RootLayout` shows `NavBar` and an `<Outlet />`, and wraps it in `<Suspense>`.
-Six pages are lazy-loaded with `React.lazy` (About, Posts, Post details, New post, Dashboard, Login).
+Eight pages are lazy-loaded with `React.lazy` (About, Posts, Post details, New post, Dashboard, Login, Signup, Profile).
 
 ### Data
 
@@ -44,10 +44,12 @@ response can never replace the current post.
 ```
 src/
 ├── App.tsx         routes only
-├── services/       service.ts: requests to DummyJSON
-├── hooks/          usePosts
-├── pages/          Home, About, Posts, Post, NewPost, Dashboard, Login, NotFound
-├── components/     RootLayout, NavBar, PostCard, Pagination, SelectField, ...
+├── firebase.ts     Firebase setup from VITE_FIREBASE_* variables
+├── context/        AuthContext (AuthProvider + useAuth)
+├── services/       service.ts (DummyJSON requests), authService.ts (Firebase auth calls)
+├── hooks/          usePosts, usePost, useCreatePost (TanStack Query)
+├── pages/          Home, About, Posts, Post, NewPost, Dashboard, Login, Signup, Profile, NotFound
+├── components/     RootLayout, NavBar, ProtectedRoute, PostCard, Pagination, SelectField, ...
 ├── styles/         index.css
 ├── filters.ts      search, filters, sorting, reading filters from the URL
 ├── localPosts.ts   saving new posts in localStorage
