@@ -1,3 +1,4 @@
+import { getLocalPosts, saveLocalPost } from '../localPosts'
 import type { Comment, Post, User } from '../types'
 
 const BASE_URL = 'https://dummyjson.com'
@@ -44,4 +45,42 @@ export async function createPost(post: { title: string; body: string; tags: stri
 
 export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.'
+}
+
+// All posts: the ones written in this browser first, then the ones from the API.
+export async function loadPosts(signal: AbortSignal): Promise<Post[]> {
+  const apiPosts = await fetchPosts(signal)
+  return [...getLocalPosts(), ...apiPosts]
+}
+
+// One post with its author and comments. Posts written in this browser are not on the server.
+export async function loadPostDetails(id: number, signal: AbortSignal) {
+  const localPost = getLocalPosts().find((post) => post.id === id)
+  if (localPost) {
+    return { post: localPost, author: null, comments: [] as Comment[] }
+  }
+
+  const post = await fetchPost(id, signal)
+  const [author, comments] = await Promise.all([
+    fetchUser(post.userId, signal),
+    fetchComments(id, signal),
+  ])
+  return { post, author, comments }
+}
+
+// Sends the post to the API and keeps a copy in this browser (DummyJSON does not save it).
+export async function publishPost(input: { title: string; body: string; tags: string[] }) {
+  const saved = await createPost(input)
+  const newPost: Post = {
+    id: Date.now(), // unique id that never clashes with DummyJSON ids
+    title: saved.title,
+    body: saved.body,
+    tags: saved.tags,
+    reactions: { likes: 0, dislikes: 0 },
+    views: 0,
+    userId: 0,
+    isLocal: true,
+  }
+  saveLocalPost(newPost)
+  return newPost
 }

@@ -54,10 +54,33 @@ src/
 └── types.ts        TypeScript types
 ```
 
+## Authentication (Firebase)
+
+- Email/password and Google sign-in, signup (with confirm password and validation), login and logout.
+- `src/firebase.ts` starts Firebase from `VITE_FIREBASE_*` variables. The session is kept in the browser
+  (`browserLocalPersistence`), so you stay logged in after a refresh.
+- `AuthContext` (`AuthProvider` + `useAuth`) listens with `onAuthStateChanged` and gives the pages
+  `user`, `loading`, `error` and the login functions. The Firebase calls are in `src/services/authService.ts`.
+- `/profile` is protected (`ProtectedRoute`): logged-out users are sent to `/login`. It shows the email and UID.
+- The NavBar shows Login/Signup when logged out and Profile/Logout when logged in.
+
+## Caching (TanStack Query)
+
+- **Posts list** uses the key `['posts']`, and each post uses `['post', id]`. The Posts page and the Dashboard
+  share the `['posts']` cache, so moving between them does not send a new request.
+- **Expiration:** data is fresh for 5 minutes (`staleTime`). After that it is shown from the cache and
+  loaded again in the background when a page needs it. Unused data is removed after 10 minutes (`gcTime`).
+- **Invalidation:** after a new post is published (`useCreatePost`), `['posts']` is invalidated, so the list
+  loads again and shows the new post. "Try again" refetches after an error.
+- **Outdated requests:** React Query passes an `AbortSignal` to each request. If you open another post or
+  leave the page, the old request is cancelled, so it can never overwrite the newer result.
+- Loading, error and empty states are shown on every page that loads data.
+
 ## Run locally
 
 ```bash
 pnpm install
+cp .env.example .env.local   # then fill in your Firebase values
 pnpm dev
 ```
 
@@ -68,3 +91,10 @@ Open http://localhost:5173.
 Every push to `main` builds the app and deploys it to GitHub Pages
 (`.github/workflows/deploy.yml`). The app uses hash URLs (`#/posts/5`) so that refreshing any page
 works on GitHub Pages.
+
+### Firebase setup and deploy
+
+1. Create a Firebase project, add a Web app, and enable **Email/Password** and **Google** in Authentication.
+2. Add your site domain (for example `yerakairzhan.github.io`) in Authentication, Settings, Authorized domains.
+3. Put the values in `.env.local` (not committed) using `.env.example` as a template.
+4. For GitHub Pages, add the same six `VITE_FIREBASE_*` values as repository secrets, because the build runs on GitHub.

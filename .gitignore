@@ -13,3 +13,6 @@ dist/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Real Firebase keys
+.env.local

@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { createPost, getErrorMessage } from '../services/service'
+import { getErrorMessage } from '../services/service'
 import { FormField } from '../components/FormField'
-import { saveLocalPost } from '../localPosts'
+import { useCreatePost } from '../hooks/useCreatePost'
 
 interface FormErrors {
   title?: string
@@ -13,6 +13,7 @@ interface FormErrors {
 
 export default function NewPostPage() {
   const navigate = useNavigate()
+  const createPostMutation = useCreatePost()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tags, setTags] = useState('')
@@ -44,18 +45,11 @@ export default function NewPostPage() {
     setIsSubmitting(true)
     setSubmitError('')
     try {
-      const saved = await createPost({ title: title.trim(), body: body.trim(), tags: tagList })
-      const newPost = {
-        id: Date.now(), // unique id that never clashes with DummyJSON ids
-        title: saved.title,
-        body: saved.body,
-        tags: saved.tags,
-        reactions: { likes: 0, dislikes: 0 },
-        views: 0,
-        userId: 0,
-        isLocal: true,
-      }
-      saveLocalPost(newPost)
+      const newPost = await createPostMutation.mutateAsync({
+        title: title.trim(),
+        body: body.trim(),
+        tags: tagList,
+      })
       navigate(`/posts/${newPost.id}`)
     } catch (err) {
       setSubmitError(getErrorMessage(err))

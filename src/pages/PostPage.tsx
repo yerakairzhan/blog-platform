@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
-import { fetchComments, fetchPost, fetchUser, getErrorMessage } from '../services/service'
 import { CommentList } from '../components/CommentList'
 import { Message } from '../components/Message'
 import { TagList } from '../components/TagList'
-import { getLocalPosts } from '../localPosts'
+import { usePost } from '../hooks/usePost'
 import { NotFoundPage } from './NotFoundPage'
-import type { Comment, Post, Status, User } from '../types'
+import type { Status } from '../types'
 
 const LAST_POST_ID = 251 // DummyJSON has posts with ids 1 to 251
 
@@ -25,50 +23,21 @@ export default function PostPage() {
 }
 
 function PostDetails({ postId }: { postId: number }) {
-  const [post, setPost] = useState<Post | null>(null)
-  const [author, setAuthor] = useState<User | null>(null)
-  const [comments, setComments] = useState<Comment[]>([])
-  const [status, setStatus] = useState<Status>('loading')
-  const [error, setError] = useState('')
+  const { data, status: queryStatus, error: queryError } = usePost(postId)
   const navigate = useNavigate()
   const location = useLocation()
 
-  useEffect(() => {
-    // Posts created in this browser are not on the server.
-    const localPost = getLocalPosts().find((p) => p.id === postId)
-    if (localPost) {
-      setPost(localPost)
-      setStatus('success')
-      return
-    }
+  const post = data ? data.post : null
+  const author = data ? data.author : null
+  const comments = data ? data.comments : []
+  const error = queryError ? queryError.message : ''
 
-    const controller = new AbortController()
-
-    async function loadPost() {
-      try {
-        const loadedPost = await fetchPost(postId, controller.signal)
-        const [loadedAuthor, loadedComments] = await Promise.all([
-          fetchUser(loadedPost.userId, controller.signal),
-          fetchComments(postId, controller.signal),
-        ])
-        setPost(loadedPost)
-        setAuthor(loadedAuthor)
-        setComments(loadedComments)
-        setStatus('success')
-      } catch (err) {
-        // Cancelled because the user already moved to another post: ignore the old result.
-        if (controller.signal.aborted) return
-        setError(getErrorMessage(err))
-        setStatus('error')
-      }
-    }
-
-    loadPost()
-
-    // Cleanup runs when postId changes or the page closes, and cancels the old request,
-    // so a slow response for an old post can never replace the current one.
-    return () => controller.abort()
-  }, [postId])
+  let status: Status = 'loading'
+  if (queryStatus === 'error') {
+    status = 'error'
+  } else if (queryStatus === 'success') {
+    status = 'success'
+  }
 
   const authorName = author ? `${author.firstName} ${author.lastName}` : 'You'
 

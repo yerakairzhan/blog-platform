@@ -290,3 +290,16 @@ textarea {
     flex-wrap: wrap;
   }
 }
+
+/* Logout button in the nav bar */
+.nav-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0057b8;
+  text-decoration: underline;
+}
+
+.nav-button:hover {
+  background: none;
+}
