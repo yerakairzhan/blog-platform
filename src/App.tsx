@@ -13,6 +13,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const OfflinePage = lazy(() => import('./pages/OfflinePage'))
 
 export function App() {
   return (
@@ -25,6 +26,7 @@ export function App() {
           <Route path="posts/new" element={<NewPostPage />} />
           <Route path="posts/:id" element={<PostPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="offline" element={<OfflinePage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="signup" element={<SignupPage />} />
           <Route element={<ProtectedRoute />}>

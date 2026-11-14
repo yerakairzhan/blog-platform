@@ -1,10 +1,22 @@
 import { getLocalPosts, saveLocalPost } from '../localPosts'
+import { reportResponse } from './connectivity'
 import type { Comment, Post, User } from '../types'
 
 const BASE_URL = 'https://dummyjson.com'
 
+// A failed fetch (no network) throws a TypeError with an unhelpful message.
+async function request(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new Error(navigator.onLine ? 'The server could not be reached.' : 'No internet connection.')
+  }
+}
+
 async function getJson<T>(path: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(BASE_URL + path, { signal })
+  const response = await request(BASE_URL + path, { signal })
+  reportResponse(response) // tells the app if this is a saved copy from the service worker
   if (!response.ok) {
     throw new Error(response.status === 404 ? 'Not found.' : `Request failed (${response.status}).`)
   }
@@ -32,7 +44,7 @@ export async function fetchComments(postId: number, signal: AbortSignal): Promis
 
 // DummyJSON checks the post and sends it back, but does not actually save it.
 export async function createPost(post: { title: string; body: string; tags: string[] }) {
-  const response = await fetch(BASE_URL + '/posts/add', {
+  const response = await request(BASE_URL + '/posts/add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...post, userId: 1 }),

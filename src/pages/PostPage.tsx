@@ -2,7 +2,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { CommentList } from '../components/CommentList'
 import { Message } from '../components/Message'
 import { TagList } from '../components/TagList'
+import { useConnectivity } from '../hooks/useConnectivity'
 import { usePost } from '../hooks/usePost'
+import OfflinePage from './OfflinePage'
 import { NotFoundPage } from './NotFoundPage'
 import type { Status } from '../types'
 
@@ -24,6 +26,7 @@ export default function PostPage() {
 
 function PostDetails({ postId }: { postId: number }) {
   const { data, status: queryStatus, error: queryError } = usePost(postId)
+  const { online } = useConnectivity()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -64,9 +67,11 @@ function PostDetails({ postId }: { postId: number }) {
 
       {status === 'loading' && <Message text="Loading post..." />}
 
-      {status === 'error' && error === 'Not found.' && <Message text="This post does not exist." />}
+      {status === 'error' && !online && <OfflinePage />}
 
-      {status === 'error' && error !== 'Not found.' && (
+      {status === 'error' && online && error === 'Not found.' && <Message text="This post does not exist." />}
+
+      {status === 'error' && online && error !== 'Not found.' && (
         <Message text={`Could not load the post. ${error}`} />
       )}
 

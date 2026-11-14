@@ -3,12 +3,15 @@ import { Link } from 'react-router'
 import { Message } from '../components/Message'
 import { SelectField } from '../components/SelectField'
 import { getAllTags } from '../filters'
+import { useConnectivity } from '../hooks/useConnectivity'
 import { usePosts } from '../hooks/usePosts'
+import OfflinePage from './OfflinePage'
 
 const TOP_TAGS_COUNT = 5
 
 export default function DashboardPage() {
   const { posts, status, error, retry } = usePosts()
+  const { online } = useConnectivity()
   const [tag, setTag] = useState('')
 
   // The tag filter changes every number on this page.
@@ -49,7 +52,9 @@ export default function DashboardPage() {
 
       {status === 'loading' && <Message text="Loading statistics..." />}
 
-      {status === 'error' && (
+      {status === 'error' && !online && <OfflinePage />}
+
+      {status === 'error' && online && (
         <Message text={`Could not load posts. ${error}`}>
           <button onClick={retry}>Try again</button>
         </Message>

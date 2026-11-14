@@ -12,10 +12,13 @@ import {
   getAllTags,
   getFiltersFromParams,
 } from '../filters'
+import { useConnectivity } from '../hooks/useConnectivity'
 import { usePosts } from '../hooks/usePosts'
+import OfflinePage from './OfflinePage'
 
 export default function PostsPage() {
   const { posts, status, error, retry } = usePosts()
+  const { online } = useConnectivity()
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = getFiltersFromParams(searchParams)
 
@@ -83,7 +86,9 @@ export default function PostsPage() {
 
       {status === 'loading' && <Message text="Loading posts..." />}
 
-      {status === 'error' && (
+      {status === 'error' && !online && <OfflinePage />}
+
+      {status === 'error' && online && (
         <Message text={`Could not load posts. ${error}`}>
           <button onClick={retry}>Try again</button>
         </Message>

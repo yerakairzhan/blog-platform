@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router'
 import { useAuth } from '../context/AuthContext'
+import { ConnectionIndicator } from './ConnectionStatus'
 
 export function NavBar() {
   const { user, loading, logout } = useAuth()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   async function handleLogout() {
+    setMenuOpen(false)
     await logout()
     navigate('/login')
   }
@@ -16,7 +20,24 @@ export function NavBar() {
         <Link to="/" className="logo">
           Blog Platform
         </Link>
-        <nav className="nav">
+        <ConnectionIndicator />
+        <button
+          className="menu-button"
+          aria-expanded={menuOpen}
+          aria-controls="main-nav"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          {menuOpen ? 'Close' : 'Menu'}
+        </button>
+        {/* On small screens the links are hidden until the Menu button is pressed. */}
+        <nav
+          id="main-nav"
+          className={menuOpen ? 'nav nav-open' : 'nav'}
+          onClick={(event) => {
+            // close the menu after tapping a link
+            if ((event.target as HTMLElement).closest('a')) setMenuOpen(false)
+          }}
+        >
           <NavLink to="/" end>
             Home
           </NavLink>
