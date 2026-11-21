@@ -52,6 +52,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
 
+  // The Redux version of the app lives in the redux/ folder and has its own service worker.
+  if (url.pathname.startsWith(new URL('redux/', self.registration.scope).pathname)) return
+
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request))
   } else if (url.origin === API_ORIGIN) {
