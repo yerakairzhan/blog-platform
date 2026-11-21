@@ -1,0 +1,18 @@
+# Dependencies & build output
+node_modules/
+dist/
+
+# Logs
+*.log
+
+# Editors & OS
+.idea/
+.vscode/
+.DS_Store
+*.sw?
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Real Firebase keys
+.env.local
